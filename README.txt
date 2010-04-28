@@ -1,4 +1,4 @@
-FolderToHTML (C)opyright 2010 Hanns Holger. This is in the public domain.
+FolderToHTML (C)opyright 2010 Hanns Holger Rutz. This is in the public domain.
 
 A simple command line tool to create an HTML index for a given folder. No thrills.
 
