@@ -1,6 +1,6 @@
 # FolderToHTML
 
-(C)opyright 2010-2011 Hanns Holger Rutz. This is in the public domain.
+(C)opyright 2010&ndash;2012 Hanns Holger Rutz. This is in the public domain.
 
 A simple command line tool to create an HTML index for a given folder. No thrills.
 
@@ -10,6 +10,8 @@ To run the executable:
 
     $ sbt
     > run -C <targetFolderToIndex> [-f <htmlIndexFile>]
+    
+If the `-f` argument is omitted, the `index.html` file will be created (possibly overwriting!) inside the target folder.
 
 __This software comes as is, absolute without warranties. Use at own risk.__
 
