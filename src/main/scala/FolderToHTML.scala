@@ -1,162 +1,198 @@
-import collection.mutable.{HashMap, ListBuffer}
+// written by Hanns Holger Rutz. Placed in the public domain.
+
 import java.awt.image.BufferedImage
-import java.awt.{Component, Toolkit}
-import java.io.{IOException, RandomAccessFile, File}
+import java.io.RandomAccessFile
 import java.text.DateFormat
 import java.util.{Date, Locale}
 import javax.imageio.ImageIO
+import javax.swing.{UIManager, JLabel}
 import javax.swing.filechooser.FileSystemView
-import javax.swing.{JLabel, JComponent, Icon}
 
-/**
- *    @version 0.10, 11-Apr-10
- */
+import de.sciss.file._
+import scopt.OptionParser
+
+import scala.collection.mutable
+import scala.util.control.NonFatal
+
 object FolderToHTML {
-   /**
-    *    Options
-    *    -C    <listed folder> (optional)
-    *    -f    <target index file> (optional)
-    *    -a    include hidden files
-    *    -i    include icons
-    */
-   def main( args: Array[ String ]) {
-      val argsL      = ListBuffer( args: _* )
-      val folder     = new File( getStringArg( argsL, "-C" ) getOrElse "" )
-      val file       = getStringArg( argsL, "-f" ).map( new File( _ )) getOrElse new File( folder, "index.html" )
-      val hidden     = getSwitchArg( argsL, "-a" )
-      val useIcons   = getSwitchArg( argsL, "-i" )
-//      val recursive  = ...
-      if( argsL.nonEmpty ) {
-         println( argsL.mkString( "WARNING: Unprocessed args : ", ", ", " !" ))
+  case class Config(index: Option[File] = None, directory: File = file(""),
+                    hidden: Boolean = false, icons: Boolean = false,
+                    size: Boolean = false, date: Boolean = false, overwrite: Boolean = false,
+                    recursive: Boolean = false, title: String = "")
+
+  def main(args: Array[String]): Unit = {
+    val parser = new OptionParser[Config]("FolderToHTML") {
+      opt[File]('f', "index")     text "Index .html file"                        action { (x, c) => c.copy(index      = Some(x)) }
+      arg[File]("directory") required() text "Directory to index"                action { (x, c) => c.copy(directory  = x) }
+      opt[Unit]('a', "hidden")    text "Include hidden files"                    action { (_, c) => c.copy(hidden     = true) }
+      opt[Unit]('i', "icons")     text "Generate icons"                          action { (_, c) => c.copy(icons      = true) }
+      opt[Unit]('z', "size")      text "Generate column with file sizes"         action { (_, c) => c.copy(size       = true) }
+      opt[Unit]('m', "date")      text "Generate column with last-modified date" action { (_, c) => c.copy(date       = true) }
+      opt[Unit]('y', "overwrite") text "Force overwrite existing index"          action { (_, c) => c.copy(overwrite  = true) }
+      opt[Unit]('r', "recursive") text "Recursively created sub-directory indices" action { (_, c) => c.copy(recursive= true) }
+      opt[String]('t', "title") text "Title (defaults to directory name)" action { (x, c) => c.copy(title = x) }
+    }
+    parser.parse(args, Config()).fold(sys.exit(1))(run)
+  }
+
+  def run(config: Config): Unit =
+    try {
+      perform(config)
+      System.exit(0)
+    }
+    catch {
+      case NonFatal(e) =>
+        e.printStackTrace()
+        sys.exit(1)
+    }
+
+  def perform(config: Config): Unit = {
+    import config.{index => _, _}
+    val index = config.index.getOrElse(directory / "index.html")
+    if (index.exists() && !overwrite) {
+      Console.err.println(s"Index '$index' already exists. Not overwriting.")
+      sys.exit(1)
+    }
+
+    val iconDir   = directory / "_icons"
+    if (icons) {
+      iconDir.mkdir()
+      iconDir.children(_.ext.toLowerCase == "png").foreach(_.delete())
+      // 'Ocean' has really crappy icons. Try to find 'Nimbus'.
+      UIManager.getInstalledLookAndFeels.find(_.getName == "Nimbus").foreach { info =>
+        try {
+          val className = info.getClassName
+  //        val className = UIManager.getSystemLookAndFeelClassName
+          UIManager.setLookAndFeel(className)
+        } catch {
+          case NonFatal(_) => // ignore
+        }
       }
-      try {
-         perform( file, folder, hidden, useIcons )
-         System.exit( 0 )
+    }
+
+    val df        = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.MEDIUM, Locale.US)
+    val fsv       = FileSystemView.getFileSystemView
+    val files     = fsv.getFiles(directory, !hidden).toList.filterNot { f =>
+      f == index || (icons && f == iconDir)
+    }
+    val images    = mutable.Map.empty[String, String]
+    if (index.exists()) index.delete()
+    val htmlFile  = new RandomAccessFile(index, "rw")
+
+    val html      = new StringBuilder()
+    val titleStr  = if (title.isEmpty) directory.name else title
+    html.append(
+      s"""<!DOCTYPE html>
+         |<HTML>
+         |<HEAD>
+         |<TITLE>Index of "${escapeHTML(titleStr)}"</TITLE>
+         |<STYLE TYPE="text/css"><!--
+         |  BODY {
+         |    margin:32px;
+         |  }
+         |  TR.head {
+         |    font-weight:bold;
+         |  }
+         |  TD {
+         |    font-family:"Liberation Sans","Lucida Grande","Helvetica","Arial","sans-serif";
+         |    font-size:12px;
+         |    padding-right:20px;
+         |    vertical-align:baseline;
+         |  }
+         |  TD.size {
+         |    text-align:right;
+         |  }
+         |  TD.date {
+         |    text-align:center;
+         |  }
+         |  A {
+         |    text-decoration:none;
+         |  }
+         |  A:hover {
+         |    text-decoration:underline;
+         |  }
+         |  A IMG {
+         |    border:none;
+         |    padding-right:4px;
+         |  }
+         |-->
+         |</STYLE>
+         |</HEAD>
+         |<BODY>
+         |<TABLE>
+         |""".stripMargin
+    )
+
+    html.append("""<TR CLASS="head"><TD CLASS="name">Name</TD>""")
+    if (size) html.append("""<TD CLASS="size">Size</TD>""")
+    if (date) html.append("""<TD CLASS="date">Last modified</TD>""")
+    html.append("</TR>\n")
+
+    files.foreach { f =>
+      html.append("<TR>")
+      val nameStr = escapeHTML(f.name)
+      html.append(s"""<TD CLASS="name"><A HREF="$nameStr">""")
+      if (icons) {
+        val imgName = getIconName(f, fsv, images, iconDir)
+        html.append(s"""<IMG SRC="${iconDir.name}/$imgName" ALT="icon"/>""")
       }
-      catch { case e => {
-         e.printStackTrace()
-         System.exit( 1 )
-      }}
-   }
-
-   def getStringArg( argsL: ListBuffer[ String ], switch: String ) : Option[ String ] = {
-      val idx = argsL.indexOf( switch )
-      if( (idx >= 0) && (idx + 1 < argsL.size) ) {
-         val res = Some( argsL( idx + 1 ))
-         argsL.remove( idx, 2 )
-         res
-      } else None
-   }
-
-   def getSwitchArg( argsL: ListBuffer[ String ], switch: String ) : Boolean = {
-      val idx = argsL.indexOf( switch )
-      if( idx >= 0 ) {
-         argsL.remove( idx )
-         true
-      } else false
-   }
-
-//   def createIconFolder( folder: File ) : File = {
-//      var test = new File( folder, ".icons" )
-//      var cnt  = 0
-//      while( test.exists ) {
-//         cnt += 1
-//         test = new File( folder, ".icons" + cnt )
-//      }
-//      test
-//   }
-
-   def perform( file: File, folder: File, hidden: Boolean, useIcons: Boolean ) {
-      val df      = DateFormat.getDateTimeInstance( DateFormat.MEDIUM, DateFormat.MEDIUM, Locale.US )
-      val fsv     = FileSystemView.getFileSystemView
-      val files   = ListBuffer( fsv.getFiles( folder, !hidden ): _* )
-      if( file.exists && !file.delete ) throw new IOException( "Could not overwrite file '" + file + "'" )
-      val images  = new HashMap[ String, String ]
-      val htmlFile = new RandomAccessFile( file, "rw" )
-      var html    =
-"""<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN"
-   "http://www.w3.org/TR/REC-html40/loose.dtd">
-<HTML>
-<HEAD>
-   <TITLE>Index of """ + folder.getName + """</TITLE>
-   <META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=utf-8">
-	<STYLE TYPE="text/css"><!--
-BODY {
-   margin:32px;
-}
-TR {
-   vertical-align:center
-}
-TR.head {
-   font-weight:bold;
-}
-TD {
-	font-family:"Lucida Grande","Helvetica","Arial","sans-serif";
-	font-size:12px;
-   padding-right:20px;
-}
-TD.size {
-    text-align:right;
-}
-TD.date {
-    text-align:center;
-}
-A {
-	text-decoration:none;
-}
-a:hover {
-	text-decoration:underline;
-}
-A IMG {
-   border:none;
-   padding-right:4px;
-   vertical-align:center;
-}
-	-->
-	</STYLE>
-</HEAD>
-<BODY>
-<TABLE>
-<TR CLASS="head"><TD CLASS="name">Name</TD><TD CLASS="size">Size</TD><TD CLASS="date">Last modified</TD></TR>
-"""
-      val iconFolder = new File( folder, "_icons" )
-      if( useIcons ) iconFolder.mkdir
-      files --= List( iconFolder, file )
-      files.foreach( f => {
-         val img  = if( useIcons ) iconFolder.getName + File.separator + getIconName( f, fsv, images, iconFolder ) else ""
-         val name = f.getName
-         val size = if( f.isFile ) {
-            val bytes = f.length
-            (bytes / 1024).toString + " KB"
-         } else {
-            ""
-         }
-         val date = df.format( new Date( f.lastModified ))
-         html += (<TR><TD CLASS="name"><A HREF={name}>{if( useIcons ) <IMG SRC={img} ALT="icon"/> else xml.Null}{name}</A></TD><TD CLASS="size">{size}</TD><TD CLASS="date">{date}</TD></TR>).toString + "\n"
-      })
-      html +=
-"""</TABLE>
-</BODY>
-</HTML>"""
-      htmlFile.write( html.getBytes( "UTF-8" ))
-      htmlFile.close()
-   }
-
-   def getIconName( file: File, fsv: FileSystemView, map: HashMap[ String, String ], folder: File ) = {
-//      val typ  = fsv.getSystemTypeDescription( file )
-      val icon = fsv.getSystemIcon( file )
-      val typ  = icon.hashCode.toString
-      val iconName   = typ + ".png"
-      if( !map.contains( typ )) {
-         val img  = new BufferedImage( icon.getIconWidth, icon.getIconHeight, BufferedImage.TYPE_INT_ARGB )
-         val g    = img.createGraphics
-         val c    = new JLabel
-         c.setSize( img.getWidth, img.getHeight )
-         icon.paintIcon( c, g, 0, 0 )
-         val iconFile   = new File( folder, iconName )
-         ImageIO.write( img, "png", iconFile )
-         map += typ -> iconName
+      html.append(s"""$nameStr</TD>""")
+      if (size) {
+        val szStr = if (f.isFile) {
+          val bytes = f.length
+          s"${bytes / 1024} KB"
+        } else {
+          ""
+        }
+        html.append(s"""<TD CLASS="size">$szStr</TD>""")
       }
-      iconName
-   }
+      if (date) {
+        val dateStr = df.format(new Date(f.lastModified))
+        html.append(s"""<TD CLASS="date">$dateStr</TD>""")
+      }
+      html.append("</TR>\n")
+
+      if (f.isDirectory && recursive)
+        perform(config.copy(index = Some(index.parent / f.name / index.name), directory = directory / f.name))
+    }
+    html.append(
+      """</TABLE>
+        |</BODY>
+        |</HTML>""".stripMargin
+    )
+    htmlFile.write(html.result().getBytes("UTF-8"))
+    htmlFile.close()
+  }
+
+  // cf. https://stackoverflow.com/questions/1265282/recommended-method-for-escaping-html-in-java
+  def escapeHTML(s: String): String = {
+    val out = new StringBuilder(math.max(16, s.length()))
+    s.foreach { c =>
+      if (c > 127 || c == '"' || c == '<' || c == '>' || c == '&') {
+        out.append("&#")
+        out.append(c.toInt)
+        out.append(';')
+      } else {
+        out.append(c)
+      }
+    }
+    out.result()
+  }
+
+  def getIconName(file: File, fsv: FileSystemView, cache: mutable.Map[String, String], directory: File): String = {
+    val icon      = fsv.getSystemIcon(file)
+    val typ       = icon.hashCode.toString
+    val iconName  = s"$typ.png"
+    if (!cache.contains(typ)) {
+      val img     = new BufferedImage(icon.getIconWidth, icon.getIconHeight, BufferedImage.TYPE_INT_ARGB)
+      val g       = img.createGraphics()
+      val c       = new JLabel
+      c.setSize(img.getWidth, img.getHeight)
+      icon.paintIcon(c, g, 0, 0)
+      val iconFile = directory / iconName
+      ImageIO.write(img, "png", iconFile)
+      cache += typ -> iconName
+    }
+    iconName
+  }
 }

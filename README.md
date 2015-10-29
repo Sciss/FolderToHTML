@@ -1,17 +1,21 @@
 # FolderToHTML
 
-(C)opyright 2010&ndash;2012 Hanns Holger Rutz. This is in the public domain.
+[![Build Status](https://travis-ci.org/Sciss/FolderToHTML.svg?branch=master)](https://travis-ci.org/Sciss/FolderToHTML)
 
-A simple command line tool to create an HTML index for a given folder. No thrills.
+(C)opyright 2010&ndash;2015 Hanns Holger Rutz. This is in the public domain.
 
-This builds with sbt 0.11.3 against Scala 2.9.2 / Java SE 6.
+A simple command line tool to create an HTML index for a given folder. No bells or whistles.
+
+This builds with sbt against Scala 2.11.
 
 To run the executable:
 
     $ sbt
-    > run -C <targetFolderToIndex> [-f <htmlIndexFile>]
+    > run [-f <htmlIndexFile>] <targetFolderToIndex>
+     
+Or `sbt 'run -f <htmlIndexFile>] <targetFolderToIndex>'`. To get all options use `sbt run` without extra arguments.
     
-If the `-f` argument is omitted, the `index.html` file will be created (possibly overwriting!) inside the target folder.
+If the `-f` argument is omitted, the `index.html` file will be created inside the target folder.
 
 __This software comes as is, absolute without warranties. Use at own risk.__
 

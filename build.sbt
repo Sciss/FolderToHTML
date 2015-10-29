@@ -1,14 +1,18 @@
-name := "FolderToHTML"
+name          := "FolderToHTML"
 
-version := "0.10"
+version       := "0.12.0"
 
-organization := "de.sciss"
+organization  := "de.sciss"
 
-scalaVersion := "2.9.2"
+scalaVersion  := "2.11.7"
 
-description := "A simple tool to create a HTML index for a folder"
+description   := "A simple tool to create a HTML index for a folder"
 
-homepage := Some( url( "https://github.com/Sciss/FolderToHTML" ))
+homepage      := Some(url(s"https://github.com/Sciss/${name.value}"))
 
-licenses := Seq( "GPL v2+" -> url( "http://www.gnu.org/licenses/gpl-2.0.txt" ))
+libraryDependencies ++= Seq(
+  "com.github.scopt"       %% "scopt"     % "3.3.0",
+  "de.sciss"               %% "fileutil"  % "1.1.1"
+)
 
+scalacOptions ++= Seq("-deprecation", "-unchecked", "-feature", "-encoding", "utf8", "-Xfuture")
