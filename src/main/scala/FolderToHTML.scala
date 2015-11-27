@@ -3,10 +3,10 @@
 import java.awt.image.BufferedImage
 import java.io.RandomAccessFile
 import java.text.DateFormat
-import java.util.{Date, Locale}
+import java.util.{Comparator, Date, Locale}
 import javax.imageio.ImageIO
-import javax.swing.{UIManager, JLabel}
 import javax.swing.filechooser.FileSystemView
+import javax.swing.{JLabel, UIManager}
 
 import de.sciss.file._
 import scopt.OptionParser
@@ -72,7 +72,12 @@ object FolderToHTML {
 
     val df        = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.MEDIUM, Locale.US)
     val fsv       = FileSystemView.getFileSystemView
-    val files     = fsv.getFiles(directory, !hidden).toList.filterNot { f =>
+
+    implicit val nameComparator = new Comparator[String] {
+      def compare(s1: String, s2: String): Int = compareName(s1, s2)
+    }
+
+    val files     = fsv.getFiles(directory, !hidden).toList.sortBy(_.name).filterNot { f =>
       f == index || (icons && f == iconDir)
     }
     val images    = mutable.Map.empty[String, String]
@@ -194,5 +199,59 @@ object FolderToHTML {
       cache += typ -> iconName
     }
     iconName
+  }
+
+  // compares strings insensitive to case but sensitive to integer numbers
+  def compareName(s1: String, s2: String): Int = {
+    // this is a quite ugly direct translation from a Java snippet I wrote,
+    // could use some scala'fication
+
+    val n1  = s1.length
+    val n2  = s2.length
+    val min = math.min(n1, n2)
+
+    var i = 0
+    while (i < min) {
+      var c1 = s1.charAt(i)
+      var c2 = s2.charAt(i)
+      var d1 = Character.isDigit(c1)
+      var d2 = Character.isDigit(c2)
+
+      if (d1 && d2) {
+        // Enter numerical comparison
+        var c3, c4 = ' '
+        do {
+          i += 1
+          c3 = if (i < n1) s1.charAt(i) else 'x'
+          c4 = if (i < n2) s2.charAt(i) else 'x'
+          d1 = Character.isDigit(c3)
+          d2 = Character.isDigit(c4)
+        }
+        while (d1 && d2 && c3 == c4)
+
+        if (d1 != d2) return if (d1) 1 else -1
+        if (c1 != c2) return c1 - c2
+        if (c3 != c4) return c3 - c4
+        i -= 1
+
+      }
+      else if (c1 != c2) {
+        c1 = Character.toUpperCase(c1)
+        c2 = Character.toUpperCase(c2)
+
+        if (c1 != c2) {
+          c1 = Character.toLowerCase(c1)
+          c2 = Character.toLowerCase(c2)
+
+          if (c1 != c2) {
+            // No overflow because of numeric promotion
+            return c1 - c2
+          }
+        }
+      }
+
+      i += 1
+    }
+    n1 - n2
   }
 }
