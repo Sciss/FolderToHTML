@@ -1,8 +1,8 @@
 # FolderToHTML
 
-[![Build Status](https://travis-ci.org/Sciss/FolderToHTML.svg?branch=master)](https://travis-ci.org/Sciss/FolderToHTML)
+[![Build Status](https://travis-ci.org/Sciss/FolderToHTML.svg?branch=main)](https://travis-ci.org/Sciss/FolderToHTML)
 
-(C)opyright 2010&ndash;2018 Hanns Holger Rutz. This is in the public domain.
+(C)opyright 2010&ndash;2020 Hanns Holger Rutz. This is in the public domain.
 
 A simple command line tool to create an HTML index for a given folder. No bells or whistles.
 
