@@ -2,11 +2,11 @@
 
 [![Build Status](https://travis-ci.org/Sciss/FolderToHTML.svg?branch=master)](https://travis-ci.org/Sciss/FolderToHTML)
 
-(C)opyright 2010&ndash;2016 Hanns Holger Rutz. This is in the public domain.
+(C)opyright 2010&ndash;2018 Hanns Holger Rutz. This is in the public domain.
 
 A simple command line tool to create an HTML index for a given folder. No bells or whistles.
 
-This builds with sbt against Scala 2.11.
+This builds with sbt against Scala 2.13.
 
 To run the executable:
 

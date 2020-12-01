@@ -1,16 +1,15 @@
 // written by Hanns Holger Rutz. Placed in the public domain.
 
-import java.awt.image.BufferedImage
-import java.io.RandomAccessFile
-import java.text.DateFormat
-import java.util.{Comparator, Date, Locale}
-import javax.imageio.ImageIO
-import javax.swing.filechooser.FileSystemView
-import javax.swing.{JLabel, UIManager}
-
 import de.sciss.file._
 import scopt.OptionParser
 
+import java.awt.image.BufferedImage
+import java.io.RandomAccessFile
+import java.text.DateFormat
+import java.util.{Date, Locale}
+import javax.imageio.ImageIO
+import javax.swing.filechooser.FileSystemView
+import javax.swing.{JLabel, UIManager}
 import scala.collection.mutable
 import scala.util.control.NonFatal
 
@@ -23,7 +22,7 @@ object FolderToHTML {
   def main(args: Array[String]): Unit = {
     val parser = new OptionParser[Config]("FolderToHTML") {
       opt[File]('f', "index")     text "Index .html file"                        action { (x, c) => c.copy(index      = Some(x)) }
-      arg[File]("directory") required() text "Directory to index"                action { (x, c) => c.copy(directory  = x) }
+      arg[File]("directory").required() text "Directory to index"                action { (x, c) => c.copy(directory  = x) }
       opt[Unit]('a', "hidden")    text "Include hidden files"                    action { (_, c) => c.copy(hidden     = true) }
       opt[Unit]('i', "icons")     text "Generate icons"                          action { (_, c) => c.copy(icons      = true) }
       opt[Unit]('z', "size")      text "Generate column with file sizes"         action { (_, c) => c.copy(size       = true) }
@@ -73,9 +72,7 @@ object FolderToHTML {
     val df        = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.MEDIUM, Locale.US)
     val fsv       = FileSystemView.getFileSystemView
 
-    implicit val nameComparator = new Comparator[String] {
-      def compare(s1: String, s2: String): Int = compareName(s1, s2)
-    }
+//    implicit val nameComparator: Comparator[String] = (s1: String, s2: String) => compareName(s1, s2)
 
     val files     = fsv.getFiles(directory, !hidden).toList.sortBy(_.name).filterNot { f =>
       f == index || (icons && f == iconDir)
